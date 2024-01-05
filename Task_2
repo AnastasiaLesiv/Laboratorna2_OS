@@ -1,0 +1,110 @@
+using System;
+using System.Diagnostics;
+
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        
+        if (args.Length != 1)
+        {
+            Console.WriteLine("Usage: dotnet Laboratorna2_OS.2.dll <pid>");
+            return;
+        }
+        int rootPid;
+        if (!int.TryParse(args[0], out rootPid))
+        {
+            Console.WriteLine("Invalid process ID.");
+            return;
+        }
+
+        while (true)
+        {
+            Console.WriteLine("Choise an action:\n0 - quit\n1 - display\n2 - kill");
+            string answer = Console.ReadLine();
+            int choise;
+            if (!int.TryParse(answer, out choise))
+            {
+                Console.WriteLine("Enter one of these options.");
+                continue;
+            }
+            switch (choise)
+            {
+                case 0:
+                    return;
+                case 1:
+                    Console.WriteLine($"Process Tree for PID {rootPid}:");
+                    DisplayProcessTree(rootPid, "");
+                    break;
+                case 2:
+                    Console.WriteLine("Do you want to terminate the entire process tree? (y/n)");
+                    string response = Console.ReadLine();
+                    if (response.ToLower() == "y")
+                    {
+                        TerminateProcessTree(rootPid); 
+                    }
+                    Console.WriteLine("Process tree terminated.");
+                    break;
+                default:
+                    Console.WriteLine("Incorrect answer.");
+                    break;
+            }
+        }
+    }
+
+    static void DisplayProcessTree(int parentId, string indent)
+    {
+        Process[] childProcesses = GetChildProcesses(parentId);
+       
+        foreach (Process child in childProcesses)
+        {
+            Console.WriteLine($"{indent}└─ {child.Id} {child.ProcessName}");
+            DisplayProcessTree(child.Id, indent + "   ");
+        }
+
+    }
+
+    static void TerminateProcessTree(int parentId)
+    {
+        Process[] childProcesses = GetChildProcesses(parentId);
+       
+            foreach (Process child in childProcesses)
+            {
+                TerminateProcessTree(child.Id);
+                child.Kill();
+            }
+            
+    }
+
+    static Process[] GetChildProcesses(int parentId)
+    {
+        Process[] allProcesses = Process.GetProcesses();
+        return Array.FindAll(allProcesses, p => GetParentProcessId(p.Id) == parentId);
+    }
+
+    static int GetParentProcessId(int pid)
+    {
+        string psCommand = $"ps -o ppid= -p {pid}";
+        ProcessStartInfo psi = new ProcessStartInfo("bash", $"-c \"{psCommand}\"")
+        {
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        Process process = new Process() { StartInfo = psi };
+        process.Start();
+        process.WaitForExit();
+
+        int parentPid;
+        if (int.TryParse(process.StandardOutput.ReadToEnd(), out parentPid))
+        {
+            return parentPid;
+        }
+        else
+        {
+            return -1; 
+        }
+    }
+}
